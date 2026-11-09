@@ -6,6 +6,7 @@ import wl "../wayland"
 Device_Kind :: enum {
 	Keyboard,
 	Pointer,
+	Touch,
 }
 
 Device :: struct {
@@ -31,6 +32,14 @@ Pointer :: struct {
 	output_name: string,
 	events:      struct {
 		motion, motion_absolute, button, axis, frame: wl.Signal,
+	},
+}
+
+Touch :: struct {
+	base:        Device,
+	output_name: string,
+	events:      struct {
+		down, up, motion, cancel, frame: wl.Signal,
 	},
 }
 
@@ -65,9 +74,18 @@ Axis_Event :: struct {
 	delta_discrete:                          i32,
 }
 
+// Positions are normalized to the mapped output; up and cancel leave them zero.
+Touch_Event :: struct {
+	touch:     ^Touch,
+	time_msec: u32,
+	id:        i32,
+	x, y:      f64,
+}
+
 keyboard_of :: proc(d: ^Device) -> ^Keyboard {
 	return cast(^Keyboard)d if d.kind == .Keyboard else nil
 }
 
 pointer_of :: proc(d: ^Device) -> ^Pointer {return cast(^Pointer)d if d.kind == .Pointer else nil}
+touch_of :: proc(d: ^Device) -> ^Touch {return cast(^Touch)d if d.kind == .Touch else nil}
 keyboard_leds :: proc(k: ^Keyboard, leds: u32) {if k != nil && k.leds != nil {k.leds(k, leds)}}

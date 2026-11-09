@@ -73,6 +73,7 @@ lock_reset_input :: proc(s: ^Server) {
 		if !consumed {st.pointer_notify_button(s.seat, 0, code, 0)}
 		s.buttons[code] = true
 	}
+	touch_cancel_all(s)
 	sh.grab_dismiss(s.shell)
 	st.keyboard_notify_clear_focus(s.seat)
 	st.pointer_clear_focus(s.seat)

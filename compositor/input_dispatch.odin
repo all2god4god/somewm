@@ -32,6 +32,7 @@ runtime_grab_pointer :: proc(data: rawptr, on: bool) {
 			s.buttons[code]=true
 		}
 		st.pointer_notify_frame(s.seat)
+		touch_cancel_all(s)
 		s.pointer_grabbed=true
 		st.pointer_clear_focus(s.seat)
 		if s.pointer_client!=0 {
@@ -56,6 +57,7 @@ dispatch_input :: proc(s: ^Server, event: ^vm.Event) {
 	e:=event
     if lock_input(s,e) { return }
 	if e.native==.DeviceMotion { device_motion(s,e);return }
+	if e.native>=.TouchDown { touch_dispatch(s,e);return }
     current: vm.Event
     if e.native==.Button || e.native==.Axis {
         // Position follows earlier device motion; the queued payload keeps ownership.
@@ -81,7 +83,7 @@ dispatch_input :: proc(s: ^Server, event: ^vm.Event) {
 	key_blocked=key_blocked || s.keyboard_grabbed || key_epoch!=s.keyboard_epoch || e.blocked
 	pointer_blocked=pointer_blocked || s.pointer_grabbed || pointer_epoch!=s.pointer_epoch || e.blocked
 	switch e.native {
-	case .None,.DeviceMotion:
+	case .None,.DeviceMotion,.TouchDown,.TouchUp,.TouchMotion,.TouchCancel,.TouchFrame:
 	case .Key:
 		if kb==nil { return }
 		if e.pressed {

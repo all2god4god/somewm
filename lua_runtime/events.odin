@@ -5,13 +5,14 @@ import "core:c"
 import "core:fmt"
 import lua "../luajit"
 
-Native_Input :: enum { None, Key, Modifiers, DeviceMotion, Motion, Button, Axis, Frame }
+Native_Input :: enum { None, Key, Modifiers, DeviceMotion, Motion, Button, Axis, Frame, TouchDown, TouchUp, TouchMotion, TouchCancel, TouchFrame }
 Event :: struct {
     lock_generation:u64,
     notification: ^Notification,
     service,item_id,status:string,
     item_has_id,item_has_title,item_has_status,item_has_icon:bool,
-	pointer_device, motion_output: u64,
+	pointer_device, motion_output, touch_device: u64,
+	touch_id: i32,
 	allocator: runtime.Allocator,
 	id, generation: u64,
 	fd, exit_code: i32,
@@ -164,6 +165,12 @@ event_call :: proc "c" (L: ^lua.State) -> c.int {
 			if e.handle != 0 { number(L, "client", f64(e.handle)) }
 			if e.name == "button" { number(L, "button", f64(e.button)); boolean(L, "pressed", e.pressed) }
 			if e.name == "axis" { number(L, "dx", e.dx); number(L, "dy", e.dy) }
+		case "touch":
+			if e.native_surface { boolean(L,"surface",true) }
+			number(L, "x", e.px); number(L, "y", e.py)
+			if e.has_output { push_string(L, e.output); lua.setfield(L, -2, "screen") }
+			if e.handle != 0 { number(L, "client", f64(e.handle)) }
+			number(L, "id", f64(e.touch_id)); boolean(L, "pressed", e.pressed)
 		}
 		if e.name == "key" || e.name == "button" || e.name == "axis" {
 			lua.newtable(L)

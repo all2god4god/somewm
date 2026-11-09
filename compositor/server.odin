@@ -103,7 +103,10 @@ Server :: struct {
 	next_view_id:                                                                         u32,
 	keyboards:                                                                            [dynamic]^Keyboard,
 	pointers:                                                                             [dynamic]^Pointer,
-	focused:                                                                              ^View,
+	touches:                                                                              [dynamic]^Touch,
+	touch_points:                                                                         map[i32]Touch_Point,
+	next_touch:                                                                           u64,
+	focused:                                                                             ^View,
 	requested_focus, pointer_client:                                                      u32,
 	startup:                                                                              os.Process,
 	startup_running:                                                                      bool,
@@ -207,6 +210,8 @@ destroy :: proc(s: ^Server) {
 	delete(s.popups)
 	delete(s.keyboards)
 	delete(s.pointers)
+	delete(s.touches)
+	delete(s.touch_points)
 	delete(s.buttons)
 	finish_startup(s)
 	fmt.printf("Paint cleanup: live buffers %d, live bytes %d\n", sp.live_buffers, sp.live_bytes)

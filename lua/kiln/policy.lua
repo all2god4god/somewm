@@ -399,5 +399,11 @@ local function on_button(ev)
     end
     if c and ev.pressed then c:focus() end
 end
-return {key=on_key, button=on_button, rules=apply_rules}
+-- Button bindings stay pointer-only; a touch press only focuses what it lands on.
+local function on_touch(ev)
+    if not ev.pressed or not ev.screen or not ev.client then return end
+    local c = object.lookup(ev.client)
+    if c and c.mapped then c:focus() end
+end
+return {key=on_key, button=on_button, touch=on_touch, rules=apply_rules}
 end

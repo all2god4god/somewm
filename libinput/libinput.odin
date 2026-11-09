@@ -24,6 +24,7 @@ libinput :: struct {}
 libinput_event :: struct {}
 libinput_event_keyboard :: struct {}
 libinput_event_pointer :: struct {}
+libinput_event_touch :: struct {}
 libinput_interface :: struct {
 	open_restricted: proc "c" (cstring,c.int,rawptr) -> c.int,
 	close_restricted: proc "c" (c.int,rawptr),
@@ -45,6 +46,7 @@ foreign lib {
 	libinput_event_get_device :: proc(event: ^libinput_event) -> ^libinput_device ---
 	libinput_event_get_keyboard_event :: proc(event: ^libinput_event) -> ^libinput_event_keyboard ---
 	libinput_event_get_pointer_event :: proc(event: ^libinput_event) -> ^libinput_event_pointer ---
+	libinput_event_get_touch_event :: proc(event: ^libinput_event) -> ^libinput_event_touch ---
 	libinput_device_ref :: proc(device: ^libinput_device) -> ^libinput_device ---
 	libinput_device_unref :: proc(device: ^libinput_device) -> ^libinput_device ---
 	libinput_device_has_capability :: proc(device: ^libinput_device, capability: c.int) -> c.int ---
@@ -68,4 +70,8 @@ foreign lib {
 	libinput_event_pointer_get_scroll_value :: proc(event: ^libinput_event_pointer, axis: c.int) -> f64 ---
 	libinput_event_pointer_get_scroll_value_v120 :: proc(event: ^libinput_event_pointer, axis: c.int) -> f64 ---
 	libinput_device_config_scroll_get_natural_scroll_enabled :: proc(device: ^libinput_device) -> c.int ---
+	libinput_event_touch_get_time_usec :: proc(event: ^libinput_event_touch) -> u64 ---
+	libinput_event_touch_get_seat_slot :: proc(event: ^libinput_event_touch) -> i32 ---
+	libinput_event_touch_get_x_transformed :: proc(event: ^libinput_event_touch, width: u32) -> f64 ---
+	libinput_event_touch_get_y_transformed :: proc(event: ^libinput_event_touch, height: u32) -> f64 ---
 }

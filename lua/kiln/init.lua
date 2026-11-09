@@ -293,7 +293,8 @@ screen.setters.selected_tags = function(s, list)
     if #old > 0 then h[#h + 1] = old; if #h > 20 then table.remove(h, 1) end end
     s._data.selected_tags = next_sel
     s:emit('property::selected_tags', next_sel)
-    animation.start(s.name, 'reveal:'..s.name, 1, .15, 0)
+    local reveal = kiln.theme.tag_reveal or 0
+    if reveal > 0 then animation.start(s.name, 'reveal:'..s.name, 1, reveal, 0) end
     dirty(s)
     -- Membership spanning screens may change which screen owns the surface.
     for _, t in ipairs(s.tags) do for _, c in ipairs(t.clients) do dirty_client(c) end end
@@ -587,6 +588,17 @@ local function dispatch(ev)
                 end)
                 state.current_press=previous
                 if not ok then pcall(Bus.on_error,'input::'..ev.name,err) end
+            end
+        elseif ev.name == 'touch' then
+            if ev.pressed then screen.focused=by_name(ev.screen) or screen.focused end
+            if not ev._claimed and not grab.pointer_active() then
+                -- Kiln's own widgets take a touch as a primary press.
+                local press={name='button',button=1,pressed=ev.pressed,x=ev.x,y=ev.y,
+                    screen=ev.screen,client=ev.client,surface=ev.surface,mods={}}
+                local ok,err=pcall(function()
+                    if not ui_input(press) then policy.touch(ev) end
+                end)
+                if not ok then pcall(Bus.on_error,'input::touch',err) end
             end
         elseif ev.name == 'pointer_enter' then
             local c = object.lookup(ev.handle)

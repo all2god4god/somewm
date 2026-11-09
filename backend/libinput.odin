@@ -16,7 +16,7 @@ Input :: struct {
 	suspended: bool,
 }
 Input_Path :: struct { path: string, handle: ^li.libinput_device }
-Input_Device :: struct { input: ^Input, handle: ^li.libinput_device, keyboard: Keyboard, pointer: Pointer, has_keyboard, has_pointer: bool }
+Input_Device :: struct { input: ^Input, handle: ^li.libinput_device, keyboard: Keyboard, pointer: Pointer, touch: Touch, has_keyboard, has_pointer, has_touch: bool }
 input_interface := li.libinput_interface{input_open,input_close}
 input_open :: proc "c" (path: cstring, flags: i32, data: rawptr) -> i32 {
 	i := cast(^Input)data; context = i.backend.loop.ctx
@@ -74,6 +74,7 @@ input_added :: proc(i: ^Input, handle: ^li.libinput_device) {
 		li.libinput_device_unref(path.handle); path.handle = li.libinput_device_ref(handle)
 	} }
 	d.has_keyboard, d.has_pointer = li.libinput_device_has_capability(handle,0) != 0,li.libinput_device_has_capability(handle,1) != 0
+	d.has_touch = li.libinput_device_has_capability(handle,2) != 0
 	append(&i.devices,d)
 	if d.has_keyboard {
 		k := &d.keyboard; k.base = {kind=.Keyboard,name=strings.clone(name),libinput=handle}; k.leds = input_leds
@@ -86,10 +87,17 @@ input_added :: proc(i: ^Input, handle: ^li.libinput_device) {
 		for signal in ([]^wl.Signal{&p.base.events.destroy,&p.events.motion,&p.events.motion_absolute,&p.events.button,&p.events.axis,&p.events.frame}) { wl.signal_init(signal) }
 		wl.signal_emit_mutable(&i.backend.events.new_input,&p.base)
 	}
+	if d.has_touch {
+		t := &d.touch; t.base = {kind=.Touch,name=strings.clone(name),libinput=handle}
+		t.output_name = strings.clone(string(li.libinput_device_get_output_name(handle)))
+		for signal in ([]^wl.Signal{&t.base.events.destroy,&t.events.down,&t.events.up,&t.events.motion,&t.events.cancel,&t.events.frame}) { wl.signal_init(signal) }
+		wl.signal_emit_mutable(&i.backend.events.new_input,&t.base)
+	}
 }
 input_device_destroy :: proc(d: ^Input_Device) {
 	if d.has_keyboard { wl.signal_emit_final(&d.keyboard.base.events.destroy,&d.keyboard.base); delete(d.keyboard.base.name) }
 	if d.has_pointer { wl.signal_emit_final(&d.pointer.base.events.destroy,&d.pointer.base); delete(d.pointer.base.name); delete(d.pointer.output_name) }
+	if d.has_touch { wl.signal_emit_final(&d.touch.base.events.destroy,&d.touch.base); delete(d.touch.base.name); delete(d.touch.output_name) }
 	for other,n in d.input.devices { if other == d { ordered_remove(&d.input.devices,n); break } }
 	li.libinput_device_unref(d.handle); free(d)
 }
@@ -111,6 +119,20 @@ input_event :: proc(i: ^Input, event: ^li.libinput_event) {
 		key := li.libinput_event_get_keyboard_event(event)
 		e := Key_Event{u32(li.libinput_event_keyboard_get_time_usec(key)/1000),li.libinput_event_keyboard_get_key(key),li.libinput_event_keyboard_get_key_state(key)}
 		wl.signal_emit_mutable(&d.keyboard.events.key,&e); return
+	}
+	if type >= 500 && type <= 504 {
+		if !d.has_touch { return }
+		t := &d.touch; touch := li.libinput_event_get_touch_event(event)
+		if type == 504 { wl.signal_emit_mutable(&t.events.frame,t); return }
+		e := Touch_Event{t,u32(li.libinput_event_touch_get_time_usec(touch)/1000),li.libinput_event_touch_get_seat_slot(touch),0,0}
+		switch type {
+		case 500,502:
+			e.x, e.y = li.libinput_event_touch_get_x_transformed(touch,1),li.libinput_event_touch_get_y_transformed(touch,1)
+			wl.signal_emit_mutable(&t.events.down if type == 500 else &t.events.motion,&e)
+		case 501: wl.signal_emit_mutable(&t.events.up,&e)
+		case 503: wl.signal_emit_mutable(&t.events.cancel,&e)
+		}
+		return
 	}
 	if !d.has_pointer || type < 400 || type > 406 || type == 403 { return }
 	p := &d.pointer; motion := li.libinput_event_get_pointer_event(event); time := u32(li.libinput_event_pointer_get_time_usec(motion)/1000)

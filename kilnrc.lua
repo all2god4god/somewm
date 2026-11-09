@@ -5,6 +5,7 @@ local widgets = kiln.widgets
 local th = kiln.theme
 
 kiln.modkey = "super"
+th.tag_reveal = 0 -- seconds; 0 switches tags without the expand-in animation
 kiln.on("error", function(_, err)
     kiln.notify { urgency="critical", title="Oops, an error happened!", message=tostring(err) }
 end)

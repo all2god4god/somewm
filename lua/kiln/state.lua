@@ -6,7 +6,7 @@ local state = {
         bg="#181820", bg2="#101014", fg="#dcdce6", accent="#5078be", muted="#3c3c4b",
         font_size=14, font="Sans", gap=8, border_width=2, client_radius=4, titlebar_height=22,
         titlebar="#22222c", titlebar_focus="#2c2c3a", urgent="#e0a050",
-        min_size=60, resize_handle=6, bar_height=32, close="#c05068",
+        min_size=60, resize_handle=6, tag_reveal=.15, bar_height=32, close="#c05068",
         menu_width=200, menu_height=24, tooltip_gap=4, prompt_width="50%", prompt_offset=80,
         cursors={move="grabbing",resize={n="n-resize",s="s-resize",e="e-resize",w="w-resize",
             ne="ne-resize",nw="nw-resize",se="se-resize",sw="sw-resize"}},

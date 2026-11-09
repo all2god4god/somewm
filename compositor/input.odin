@@ -24,6 +24,7 @@ Keyboard :: struct {
 update_capabilities :: proc(s: ^Server) {
 	capabilities: u32 = 1 // Keep pointer requests available before a device is attached.
 	if len(s.keyboards) > 0 {capabilities |= 2}
+	if len(s.touches) > 0 {capabilities |= 4}
 	st.set_capabilities(s.seat, capabilities)
 }
 
@@ -75,6 +76,8 @@ input_added :: proc (listener: ^wl.Listener, data: rawptr) {
 		wl.listen(&handle.events.frame, &p.frame, cursor_frame)
 		map_pointers(s)
 		cursor_sync(s)
+	case .Touch:
+		touch_added(s, device)
 	}
 }
 
@@ -408,8 +411,13 @@ queue_pointer :: proc(s: ^Server, fact: vm.Event) {
 }
 
 pointer_fact :: proc(s: ^Server, e: ^vm.Event) {
-	e.class = "input"
 	e.px, e.py = s.cursor_x, s.cursor_y
+	position_fact(s, e)
+}
+
+// Fills the screen, view and modifiers under the event's layout position.
+position_fact :: proc(s: ^Server, e: ^vm.Event) {
+	e.class = "input"
 	e.has_output = false
 	e.output = ""
 	e.handle = 0

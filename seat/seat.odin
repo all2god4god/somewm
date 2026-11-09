@@ -16,13 +16,14 @@ Seat :: struct {
 	drag: ^Drag,
 	keyboard_state: Keyboard_State,
 	pointer_state: Pointer_State,
+	touch_state: Touch_State,
 	events: struct { set_selection, set_primary_selection, request_set_selection, request_set_primary_selection, request_start_drag, start_drag, request_set_cursor, pointer_focus_change, keyboard_focus_change, destroy: wl.Signal },
 	destroy: wl.Listener,
 }
 Client :: struct {
 	client: ^wl.Client,
 	seat: ^Seat,
-	seats, pointers, keyboards: [dynamic]^wl.Resource,
+	seats, pointers, keyboards, touches: [dynamic]^wl.Resource,
 	serials: [128]struct { first, last: u32 },
 	serial_count, serial_end: int,
 	enter_serial: u32,
@@ -50,10 +51,12 @@ destroy :: proc(s: ^Seat) {
 	wl.signal_emit_final(&s.events.destroy, s)
 	pointer_notify_clear_focus(s)
 	keyboard_notify_clear_focus(s)
+	touch_cancel_all(s)
 	set_keyboard(s, nil)
 	for len(s.clients) > 0 { client_destroy(s.clients[len(s.clients)-1]) }
 	wl.global_destroy(s.global)
 	delete(s.devices); delete(s.clients); delete(s.name); delete(s.pointer_state.buttons); delete(s.keyboard_state.keycodes)
+	delete(s.touch_state.points); delete(s.touch_state.pending)
 	free(s)
 }
 client_for :: proc(s: ^Seat, client: ^wl.Client) -> ^Client {
@@ -91,9 +94,10 @@ client_destroy :: proc(c: ^Client) {
 	s := c.seat
 	if s.pointer_state.focused_client == c { pointer_notify_clear_focus(s) }
 	if s.keyboard_state.focused_client == c { keyboard_notify_clear_focus(s) }
+	touch_client_gone(s, c)
 	wl.signal_emit_final(&c.events.destroy, c)
 	wl.unlisten(&c.destroy)
-	for resources in ([]^[dynamic]^wl.Resource{&c.seats, &c.pointers, &c.keyboards}) {
+	for resources in ([]^[dynamic]^wl.Resource{&c.seats, &c.pointers, &c.keyboards, &c.touches}) {
 		for r in resources^ { r.data = nil }
 		delete(resources^)
 	}
@@ -107,7 +111,7 @@ seat_request :: proc(r: ^wl.Resource, request: p.Wl_Seat_Request, args: []wl.Arg
 		switch request {
 		case .get_pointer: wl.resource_create_typed(r.client, &p.wl_pointer, r.version, u32(args[0].(wl.New_Id)), nil, pointer_request, pointer_destroy)
 		case .get_keyboard: wl.resource_create_typed(r.client, &p.wl_keyboard, r.version, u32(args[0].(wl.New_Id)), nil, keyboard_request, keyboard_destroy)
-		case .get_touch: wl.post_error(r, u32(p.Wl_Seat_Error.missing_capability), "seat never had touch capability")
+		case .get_touch: wl.resource_create_typed(r.client, &p.wl_touch, r.version, u32(args[0].(wl.New_Id)), nil, touch_request, touch_destroy)
 		case .release:
 		}
 		return
@@ -117,7 +121,8 @@ seat_request :: proc(r: ^wl.Resource, request: p.Wl_Seat_Request, args: []wl.Arg
 	switch request {
 	case .get_pointer: pointer_bind(c, r.version, u32(args[0].(wl.New_Id)))
 	case .get_keyboard: keyboard_bind(c, r.version, u32(args[0].(wl.New_Id)))
-	case .get_touch, .release:
+	case .get_touch: touch_bind(c, r.version, u32(args[0].(wl.New_Id)))
+	case .release:
 	}
 }
 set_capabilities :: proc(s: ^Seat, caps: u32) {
@@ -130,6 +135,7 @@ set_capabilities :: proc(s: ^Seat, caps: u32) {
 			c.pointer_entered = false
 		}
 		if caps&2 == 0 { for r in c.keyboards { r.data = nil }; clear(&c.keyboards) }
+		if caps&4 == 0 { for r in c.touches { r.data = nil }; clear(&c.touches) }
 		if cursor_shape_capabilities != nil { cursor_shape_capabilities(c, caps) }
 		for r in c.seats { wl.post(r, u32(p.Wl_Seat_Event.capabilities), wl.Uint(caps)) }
 	}
